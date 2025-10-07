@@ -1,0 +1,113 @@
+[project]
+name = "project_name"
+version = "0.1"
+description = "project_description"
+requires-python = ">=3.12,<4.0"
+authors = [
+    { name = "Clinton Bradford", email = "cbradford@uidaho.edu" }
+]
+
+# ✅ Core dependencies for FastAPI stack
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.31.0",
+    "sqlalchemy>=2.0.36",
+    "pydantic-settings>=2.5.2",
+    "python-multipart>=0.0.9",
+    "email-validator>=2.2.0",
+    "jinja2>=3.1.4",  # for templating if needed
+    "setuptools>=75.8.0",
+]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["project_name"]
+include = []
+
+[tool.setuptools.package-data]
+"*" = ["*.css", "*.js", "*.ts", "*.html", "*.png", "*.svg", "*.jpg"]
+
+[project.urls]
+"Homepage" = "https://github.com/northwestknowledgenetwork/project_name"
+# "Documentation" = "https://northwestknowledgenetwork.github.io/project_name"
+
+# ✅ Optional dependencies organized into logical groups
+[tool.uv]
+default-groups = ["dev", "test", "coverage", "lint", "serve"]
+
+[dependency-groups]
+dev = [
+    "tox>=4.23.2",
+    "tox-uv>=1.26.0",
+    "uv>=0.7.11",
+]
+
+test = [
+    "pytest>=8.3.4",
+    "pytest-cov>=6.1.1",
+    "httpx>=0.27.2",  # for API testing
+]
+
+coverage = [
+    "coverage>=7.6.10",
+    "pytest-sugar>=1.0.0",
+]
+
+lint = [
+    "mypy>=1.14.1",
+    "ruff>=0.9.1",
+    "black>=24.8.0",
+    "isort>=5.13.2",
+]
+
+serve = [
+    "uvicorn[standard]>=0.31.0",
+    "gunicorn>=23.0.0",
+]
+
+[tool.coverage.run]
+source = ["project_name"]
+omit = ["/project_name/static/*", "/project_name/templates/*", "/tests/*"]
+
+[tool.coverage.report]
+fail_under = 80
+
+[tool.pytest.ini_options]
+addopts = "--cov=project_name --cov-report xml"
+
+[tool.tox]
+requires = ["tox-uv", "uv"]
+env_list = ["format", "lint", "type", "3.13"]
+
+[tool.tox.env.format]
+description = "Format the code with Ruff"
+dependency_groups = ["lint"]
+skip_install = true
+commands = [["ruff", "format"]]
+
+[tool.tox.env.lint]
+description = "Lint the code with Ruff"
+dependency_groups = ["lint"]
+skip_install = true
+commands = [["ruff", "check"]]
+
+[tool.tox.env.type]
+description = "Analyze the code with mypy"
+dependency_groups = ["lint"]
+commands = [["mypy", "project_name"]]
+
+[tool.tox.env.3.13]
+dependency_groups = ["coverage", "test", "dev"]
+commands = [["pytest", "tests", "{posargs}"]]
+description = "Run pytest in a virtual environment and collect coverage"
+
+[tool.mypy]
+follow_imports = "silent"
+ignore_missing_imports = true
+python_version = "3.13"
+strict_optional = false
+
+[tool.tox.gh.python]
+"3.13" = ["3.13", "format", "lint", "mypy"]

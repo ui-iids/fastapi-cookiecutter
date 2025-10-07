@@ -1,56 +1,59 @@
-# We use a separate image to build the project.
-# This ensures that build dependencies from Python are not included.
-# Build dependencies within the project will still come through.
+# ==========================
+# 🧱 Build Stage
+# ==========================
 FROM ghcr.io/astral-sh/uv:python3.13-bookworm AS builder
 
-# Change working directory to `/app`
 WORKDIR /app
 
-# Copy necessary files to build dependencies
+# Copy only dependency metadata first for caching
 COPY pyproject.toml ./
 RUN touch README.md
 
-# Install with only the dependencies to serve the application
+# Install only the "serve" dependency group for production runtime
 RUN uv sync --no-default-groups --group serve
 
-# Use a slim image for runtime
+# ==========================
+# 🚀 Runtime Stage
+# ==========================
 FROM python:3.13-slim AS runtime
 
 WORKDIR /app
 
-RUN addgroup --gid 1001 --system gunicorn
-RUN adduser --system gunicorn --uid 1001 --gid 1001
+# Create a non-root user for security
+RUN addgroup --gid 1001 --system gunicorn && \
+    adduser --system gunicorn --uid 1001 --gid 1001
 
-# Copy this early, so changes in the project or configuration don't rebuild
+# Copy project metadata and environment
 COPY pyproject.toml .
 
-# Set the virtual environment manually
+# Set up virtual environment paths
 ENV VIRTUAL_ENV=/app/.venv \
-    PATH="/app/.venv/bin:$PATH"
+    PATH="/app/.venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1
 
-# Setup python env vars
-ENV PYTHONUNBUFFERED=1
-
-# Copy the virtual environment
+# Copy the virtual environment from the builder stage
 COPY --from=builder ${VIRTUAL_ENV} ${VIRTUAL_ENV}
 
-# Copy project files
+# Copy your application source
 COPY project_name project_name
 
-# Copy gunicorn configuration and project description
+# Copy Gunicorn configuration
 COPY gunicorn.conf.py .
 
-# Set permissions for the application and database
-RUN mkdir instance
-RUN chgrp gunicorn -R .
-RUN chmod 750 -R .
-# Local SQLite Database directory needs write
-RUN chmod 770 instance
+# Create writable instance directory (e.g., for SQLite or logs)
+RUN mkdir instance && \
+    chgrp gunicorn -R . && \
+    chmod 750 -R . && \
+    chmod 770 instance
 
 USER gunicorn
 
 EXPOSE 8000
 
-ENV GUNICORN_WORKERS=1 
+ENV GUNICORN_WORKERS=1
 
-ENTRYPOINT ["gunicorn"]
+# ==========================
+# 🦄 Entry Point
+# ==========================
+# Use Gunicorn with Uvicorn worker for ASGI (FastAPI)
+ENTRYPOINT ["gunicorn", "-k", "uvicorn.workers.UvicornWorker", "project_name.main:app", "-c", "gunicorn.conf.py"]
