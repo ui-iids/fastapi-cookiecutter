@@ -51,7 +51,7 @@ uv run uvicorn project_name.main:app --reload
 To run the project as a standalone server, run:
 
 ```bash
-uv run uvicorn project_name.main:app --host 0.0.0.0 --port 8000
+uv run uvicorn project_name.main:app --host 0.0.0.0 --port 8005
 ```
 
 You can access the API documentation UI(s) at
@@ -82,3 +82,5 @@ docker image rm project_name
 ## Authors
 
 Clinton Bradford, cbradford@uidaho.edu and Jarred kvamme, jarredk@uidaho.edu
+
+
