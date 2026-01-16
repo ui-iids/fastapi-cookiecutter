@@ -2,7 +2,9 @@ name: Build and Push Docker Image
 on:
   push:
     branches:
-      - main # Or your default branch
+      - main
+    tags:
+      - "v*.*.*"
     paths-ignore:
       - "manifest/**"
       - ".vscode/**"
@@ -34,11 +36,43 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      - name: Set outputs
-        id: vars
-        run: |
-          echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-          echo "sanitized_ref=$(echo '${{ github.head_ref || github.ref_name }}' | tr '/' '-')" >> $GITHUB_OUTPUT
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            # 1. Main branch: snapshot-latest and short SHA
+            type=raw,value=snapshot-latest,enable={{is_default_branch}}
+            type=raw,value=main,enable={{is_default_branch}}
+            type=sha,format=short,prefix=,enable={{is_default_branch}}
+
+            # 2. Semver tags (triggered on tag events)
+            # Provides: v1.2.3, v1.2, and v1
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+
+            # 3. Other branches: branch-latest
+            # Excludes 'main' to avoid collision with Rule 1
+            type=ref,event=branch,suffix=-latest,enable=${{ github.ref != 'refs/heads/main' }}
+            
+            # 4. Other branches: branch-SHA
+            # Uses the 'ref' type for branch name and 'sha' for the commit
+            type=ref,event=branch,suffix=-{{sha}},enable=${{ github.ref != 'refs/heads/main' }}
+
+            # 5. Pull Requests: pr-{number}
+            type=ref,event=pr
+
+            # 6. Pull Requests: pr-{number}-{sha}
+            type=ref,event=pr,suffix=-{{sha}}
+
+            # 7. Pull Requests: {branch}
+            type=raw,value=${{ github.head_ref }},enable=${{ github.event_name == 'pull_request' }}
+          flavor:
+            # Prevents the action from automatically adding the default 'latest' tag
+            # so you can manage it strictly through your semver/branch rules.
+            latest=false
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -50,6 +84,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
+          file: ./Dockerfile
           push: true
-          tags: ghcr.io/${{ github.repository }}:${{ steps.vars.outputs.sha_short }},ghcr.io/${{ github.repository }}:${{ steps.vars.outputs.sanitized_ref }}
-          file: ./Dockerfile.app # Specify your Dockerfile path
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
